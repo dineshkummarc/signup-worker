@@ -1,0 +1,127 @@
+#!/usr/bin/env node
+var CouchDBExternal = require("CouchDBExternal");
+var CouchDBChanges = require("CouchDBChanges");
+
+var util = require("util");
+var nodemailer = require("nodemailer");
+var request = require("request");
+var url = require("url");
+
+util.inherits(EmailSignupConfirmation, CouchDBExternal);
+
+function EmailSignupConfirmation(config) {
+  this._config = config;
+  CouchDBExternal.call(this, config.server);
+  console.warn("EmailSignupConfirmation running");
+
+  var follow_options = {
+  };
+
+  var changes_options = {
+    include_docs: true
+  };
+
+  var that = this;
+  var change_cb = function(error, change) {
+    if(error !== null) {
+      console.warn("email change_cb caught error: %j", error);
+      // todo report error
+      return;
+    }
+
+    console.warn("change: %j", change);
+    if(change.doc && change.doc.confirmed || change.doc.error) {
+      console.warn("email change_cb !change.doc || !change.doc.confirmed");
+      return; // nothing to do here
+              // TODO: actually, this should be a server-side filter
+    }
+
+    if(change.doc && change.doc.name) {
+      that._emailUserConfirmation(change.doc.name, {
+        success: function(response) {
+          console.warn("Message Sent: " + response.message);
+          // set user doc.confirmend: true
+          that._setUserDocMessage(change.doc, "confirmed", true);
+        },
+        error: function(error) {
+          console.warn("Message not sent: " + error);
+          that._setUserDocMessage(change.doc, "error", error);
+        }
+      });
+    }
+  };
+
+  var changes = new CouchDBChanges(config);
+  changes.follow("_users", change_cb, follow_options, changes_options);
+}
+
+EmailSignupConfirmation.prototype._setUserDocMessage = function(doc, field, value) {
+  console.warn("email signup confirmaion: ")
+  var uri = url.parse(this._config.server);
+  uri.path = "/_users/" + doc._id;
+  uri.auth = this._config.admin.user + ":" + this._config.admin.pass;
+  doc[field] = value;
+
+  request({
+    uri: uri,
+    method: "PUT",
+    json: doc
+  }, function(error, response) {
+    if(error) {
+      console.warn("Set Doc status " + field + ": " + value + ": " + error);
+    }
+  });
+}
+
+EmailSignupConfirmation.prototype._emailUserConfirmation = function(email, callbacks) {
+  // send email
+  // create reusable transport method (opens pool of SMTP connections)
+  var smtpTransport = nodemailer.createTransport("SMTP",{
+      host: this._config.email.host,
+      auth: {
+          user: this._config.email.user,
+          pass: this._config.email.pass
+      }
+  });
+
+  // setup e-mail data with unicode symbols
+  var mailOptions = {
+      from: this._config.email.from, // sender address
+      to: email, // list of receivers
+      subject: "Hello " + email, // Subject line
+      text: "Welcome to the world of tomorrow " + email // plaintext body
+  }
+
+  // send mail with defined transport object
+  smtpTransport.sendMail(mailOptions, function(error, response){
+      if(error) {
+          if(callbacks.error) {
+            callbacks.error(error);
+          }
+      } else {
+          if(callbacks.success) {
+            callbacks.success(response);
+          }
+      }
+      smtpTransport.close(); // shut down the connection pool, no more messages
+  });
+
+
+  // set doc.confirmed = true;
+}
+var config = {
+  server: process.env["CANG_SERVER"],
+  admin: {
+    user: process.env["CANG_ADMIN_USER"],
+    pass: process.env["CANG_ADMIN_PASS"]
+  },
+  email: {
+    from: "Cang Setup <jan@apache.org>",
+    host: process.env["CANG_EMAIL_HOST"],
+    auth: {
+      user: process.env["CANG_EMAIL_USER"],
+      auth: process.env["CANG_EMAIL_AUTH"]
+    }
+  }
+};
+new EmailSignupConfirmation(config);
