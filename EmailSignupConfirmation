@@ -30,7 +30,8 @@ function EmailSignupConfirmation(config) {
     }
 
     console.warn("change: %j", change);
-    if(change.doc && change.doc.confirmed) {
+    if(change.doc && change.doc.confirmed || change.doc.error) {
+      // try failed signups later
       console.warn("user already confirmed, thanks");
       return; // nothing to do here
               // TODO: actually, this should be a server-side filter
@@ -76,13 +77,17 @@ EmailSignupConfirmation.prototype._setUserDocMessage = function(doc, field, valu
 EmailSignupConfirmation.prototype._emailUserConfirmation = function(email, callbacks) {
   // send email
   // create reusable transport method (opens pool of SMTP connections)
-  var smtpTransport = nodemailer.createTransport("SMTP",{
+  var transport_config = {
       host: this._config.email.host,
+      port: 465,
       auth: {
-          user: this._config.email.user,
-          pass: this._config.email.pass
-      }
-  });
+          user: this._config.email.auth.user,
+          pass: this._config.email.auth.pass
+      },
+      secureConnection: true
+  };
+  console.log(transport_config);
+  var smtpTransport = nodemailer.createTransport("SMTP", transport_config);
 
   // setup e-mail data with unicode symbols
   var mailOptions = {
@@ -125,6 +130,7 @@ var config = {
     }
   }
 };
+console.log(config);
 new EmailSignupConfirmation(config);
 
 var http = require('http');
