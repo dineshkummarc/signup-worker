@@ -96,6 +96,7 @@ EmailSignupConfirmation.prototype._emailUserConfirmation = function(email, callb
   smtpTransport.sendMail(mailOptions, function(error, response){
       if(error) {
           if(callbacks.error) {
+            console.log("Mail note sent: " + error);
             callbacks.error(error);
           }
       } else {
