@@ -30,8 +30,8 @@ function EmailSignupConfirmation(config) {
     }
 
     console.warn("change: %j", change);
-    if(change.doc && change.doc.confirmed || change.doc.error) {
-      console.warn("email change_cb !change.doc || !change.doc.confirmed");
+    if(change.doc && change.doc.confirmed) {
+      console.warn("user already confirmed, thanks");
       return; // nothing to do here
               // TODO: actually, this should be a server-side filter
     }
