@@ -120,7 +120,7 @@ var config = {
     host: process.env["CANG_EMAIL_HOST"],
     auth: {
       user: process.env["CANG_EMAIL_USER"],
-      auth: process.env["CANG_EMAIL_AUTH"]
+      pass: process.env["CANG_EMAIL_PASS"]
     }
   }
 };
